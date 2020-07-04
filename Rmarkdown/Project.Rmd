@@ -1,0 +1,449 @@
+---
+title: \Large{\textbf{Player Performance, Social Power and Team Valuation in 2016-2017 NBA Season Project}}
+author: "R.L., L.Z."
+date: "STAT 6950"
+fontsize: 12pt
+geometry: margin=0.75in
+output:
+  pdf_document:
+    fig_caption: yes
+    keep_tex: true
+    number_sections: true
+citecolor : red
+urlcolor  : blue
+linkcolor : red
+---
+
+```{r, echo=FALSE}
+library("knitr") ## if this gives an error, run first install.packages("knitr")
+options(stringsAsFactors=FALSE)
+set.seed(1)
+```
+
+```{r,include=FALSE}
+library(ggplot2)
+library(GGally)
+library(Rmisc)
+library(plyr)
+library(ggpubr)
+library(DAAG)
+library(leaps)
+library(MASS)
+load("NBA.Rdata")
+```
+
+\section{Introduction}\label{intro}
+National Basketball Association(NBA) is no doubt one of the most successful sport league in the world. The successful commercialisation of NBA makes it possible for teams to offer high salaries to players, which encourages players to play harder for their future contracts. Besides, elite players who perform impressively usually have large numbers of followers on twitter, or are searched frequently on websites, which means they might have large social powers. In view of these, valuations of sports teams, whose main assets are players and especially the elite players, might be influenced by players' performance and their social powers. So for team managers, how can they determine suitable salary for players and what strategies can they take to improve team valuation?
+
+Intuitively speaking, the salaries of players are mainly determined by their performance. But considering there are so many variables to evaluate players' performance, managers might wonder which groups of them are most important. In addition, lots of players have their own social media accounts, which is a good strategy to expose themself to public. We might have good reasons to cast doubts on whether the power of social media will have some impacts on their salary. All of these will be investigated and explained in the main body, which could be used to answer the question: what determines players' salaries in NBA league?
+
+Another issue managers have to deal with is the team valuation. The valuation of a sport team is a bit hard to determine in corporation finance. Generally speaking, the income from tickets, the values of brands, the operation expenses are three main factors that make up for team valuations. These factors are associated with team performance, marketing strategy, salary structure, etc, many of which might be covered in the determimants of salaries as well. Given these information, the managers might still feel confused at what on earth determines the team valuation. Statistical analysis is provided to eliminate confusions and the managers can know what to do to increase the team valuation. 
+
+Our project aims to answer both questions raised above by using appropriate statistical models. Lending from these models, we hope to provide business insights for team managers to improve their teams in multi-dimensions.
+\section{Dataset}
+With the help of background information above, we find relevant variables from multiple sources. A main part of our dataset comes from Kaggle ([https://www.kaggle.com/noahgift/social-power-nba](https://www.kaggle.com/noahgift/social-power-nba)). In this part, data about the team valuation, average attendence of fans per game, performace statistics, salaries and social power of elite players in a team are provided. Besides, we also find regional GDP data from Bureau of Economic Analysis ([https://www.bea.gov/](https://www.bea.gov/)) and 2016-17 NBA ticket prices from VIVIDSEATs ([https://www.vividseats.com/blog/nba-ticket-prices](https://www.vividseats.com/blog/nba-ticket-prices)). All of these make up for our dataset for analysis.
+
+Some interesting issues occur in our exploratory data analysis. Firstly, players in different positions are good at different skills. For example, players in position center tend to have better performances in rebound statistics, which makes sense since they are usually higher then players in other position on average. More importantly, this informs us the importance of distinguish players in different position in the salary model since players have different strengths. Besides, we also depict the scatter plot matrix for relevant statistcis about player performances and social power, team performance and social power, etc. A good suggestion in these scatter plot matrix is we should do the logarithm transformation when investigate the team valuation. We also need to delete some outliers/influential points to regularize the dataset. All these plots are present in Appendix \ref{EDA}.
+
+\section{Player Salary: Method and Results}
+Since we are exploring the relationship between players' salary and their statistics, we will use players' salary as response variables, and their statistics as explantory variables, to build a multiple linear regression model:
+
+\begin{equation}\label{MLR}
+Y_{i} = \beta_0+\beta_1X_{1,i}+\cdots+\beta_{p-1}X_{p-1,i} + \varepsilon_i,~~i=1,2,\cdots,n.
+\end{equation}
+
+where $\varepsilon_i~iid\sim Normal(0,\sigma^2)$. Here, the $Y_i$ represents the salary of the $i$th player, and $X_{i,j}$ represents the $j$th statistic of the $i$th player. Because we do not have any prior knowledge in basketball, we decided to consider all variables into our model at first in order to see whether these explantory variables are useful to explain our response varialbe. The $R^2$ of the full model is 0.7 (we omit the summary.lm here because it is too long), which is a relatively high number. That means our explantory variables can be helpful to explain about 70\% variability of the response data around its mean. Although this full regression model is useful in predicting the player's salary, our goal is to provide an simple and interpretable model to help team manager make a decision. Therefore, to simplfy our model, we will do the variable selection at first and choose explantory variables as few as possible.
+
+```{r, include=FALSE}
+#Linear Model and Model Selection
+#Initialization
+load("NBA.RData")
+library("leaps")
+NBA_stat = da1
+NBA_stat$X<-NULL
+NBA_stat$Rk<-NULL
+NBA_stat$PLAYER<-NULL
+NBA_stat$TEAM<-NULL
+NBA_stat<-na.omit(NBA_stat)
+```
+
+```{r, include=FALSE}
+#Include all variables in our full model
+full.lm = lm(SALARY_MILLIONS~., data = NBA_stat)
+summary(full.lm)
+```
+
+
+\subsection{Potential Predictors} \label{PP}
+The dataset we collected contains many different type of potential predictors (explanatory variables). Some of these are continuous measurements, like the "Field Goals" or "Free Throws" of a player. Some of them are discrete but ordered, like a player's age. Others can be categorical, like the position of a player. All these types of potential predictors can be useful in our multiple linear regression (\ref{MLR}). The potential predictors we consider are:
+
+\begin{itemize}
+\item \textbf{The intercept}: Suppose we define $\mathbf{1}$ be a predictors that is always equal to 1, then our mean function of (\ref{MLR}) can be written as 
+$$ E(Y_{i}|\mathbf{X}) = \beta_0\mathbf{1}+\beta_1X_{1,i}+\cdots+\beta_{p-1}X_{p-1,i},~~i=1,2,\cdots,n.$$
+\item \textbf{Continuous measurements and age}: All continuous measurement are included in our regression model without any transformation. We also include the "AGE" without any transformation because we believe it is approximately continuous.
+
+\item \textbf{Dummy variables and factors}: The "POSITION" with 4 levels are considered as \textit{factor}, and they are included in \ref{MLR} using \textit{dummy vaiables}.
+
+\item \textbf{Interactions}: Based on our experience, we think that the "POSITION" of a player will interact with other potential predictors when they influence the salary of this player. For example, "POINTS" is more important to the point guard (PG), while "Defensive Rebounds" is more important to the center (C). Therefore, we include all interaction terms between "POSITION" and other predictors as our potential predictors.
+\end{itemize}
+
+To simplify our model and make it interpretable, we do not consider the transformations or the polynomials of our predictors. We would like to consider them as our future jobs.
+
+
+\subsection{Variable Selection}
+In our last subsection, we have identified the potential predictors in our model, but the question for us is how to select the useful variables and why we need to do the selection. Firstly, we need to interpret our model to a team manager, so we have to make the model simple. Too many predictors will definitely increase the complexity of our model. Also, the collinearity between variables can make our model unreasonable. For example, in our full model, which contains all potential predictors, the coefficient of "POINTS" is negative, which means the player will get fewer salary if he get more points in the game. That is obviously wrong, so we must do the variable selection to let our model seem reasonable. What's more, we have fewer than 250 data in our dataset, but the potential predictors are more than 70. Therefore, variable selection can enhance generalization by reducing overfitting, so it can make more precise prediction.
+
+The approach to finding useful predictors we use here is considering all potential predictors, and then select one subset that optimizaes the criterion (we consider AIC and BIC in this section). We have many different methods to deal with it. For example, the "All Subsets" method and Stepwise Search Methods are both very useful. However, because we have more than 70 potential explantory variables in our model, the running time of "All Subsets" method will be extremely long, so it is more sensible for us to use the Stepwise Search Methods here.
+
+At first, we employ the "Backward Elimination", "Forward Selection" and "Stepwise Regression" to minimize the AIC criterion. We run these three method, and our results are as follows:
+
+```{r, include=FALSE}
+#AIC
+#"Backward Elimination", "Forward Selection" and "Stepwise Regression"
+#No interaction
+
+fit0=lm(SALARY_MILLIONS~1,data=NBA_stat)
+fitfull=lm(SALARY_MILLIONS~.+POSITION*.,data=NBA_stat)
+
+step(fitfull, scope=list(lower=fit0, upper=fitfull),
+direction="backward")
+
+step(fit0, scope=list(lower=fit0, upper=fitfull),
+direction="forward")
+
+step(fit0, scope=list(lower=fit0, upper=fitfull),
+direction="both")
+
+#linear regression for "forward" and stepwise
+lm.forward =lm(SALARY_MILLIONS ~ POINTS + AGE + DRB + PF + AST + eFG. + W + FG. + TOV + ORPM + FGA + PAGEVIEWS + TWITTER_FAVORITE_COUNT + TWITTER_RETWEET_COUNT + X2P, data = NBA_stat)
+lm.both =lm(SALARY_MILLIONS ~ POINTS + AGE + DRB + PF + AST + 
+    eFG. + W + TOV + ORPM + FGA + PAGEVIEWS + TWITTER_FAVORITE_COUNT + 
+    TWITTER_RETWEET_COUNT, data = NBA_stat)
+```
+
+\begin{enumerate}
+\item \textbf{Backward Elimination} It chooses almost all potential predictors, and it gets AIC=641.89.
+\item \textbf{Forward Selection} It chooses "POINTS + AGE + DRB + PF + AST + eFG. + W + FG. + TOV + ORPM + FGA + PAGEVIEWS + TWITTER FAVORITE COUNT + TWITTER RETWEET COUNT + X2P" as predictor, and it gets AIC=671.14.
+\item \textbf{Stepwise Regression} It chooses "POINTS + AGE + DRB + PF + AST + eFG. + W + TOV + ORPM + FGA + PAGEVIEWS + TWITTER FAVORITE COUNT + TWITTER RETWEET COUNT" as predictor and it gets AIC=670.52
+\end{enumerate}
+
+Similarly, we employ the BIC criterion and get the following result:
+
+```{r, include=FALSE}
+#BIC
+#"Backward Elimination", "Forward Selection" and "Stepwise Regression"
+
+fit0=lm(SALARY_MILLIONS~1,data=NBA_stat)
+fitfull=lm(SALARY_MILLIONS~.+POSITION*.,data=NBA_stat)
+
+step(fitfull, k=log(nrow(NBA_stat)), scope=list(lower=fit0, upper=fitfull),
+direction="backward")
+
+step(fit0, k=log(nrow(NBA_stat)), scope=list(lower=fit0, upper=fitfull),
+direction="forward")
+
+step(fit0, k=log(nrow(NBA_stat)), scope=list(lower=fit0, upper=fitfull),
+direction="both")
+
+
+#stepwise and forward have the same result
+lm.backward =lm(SALARY_MILLIONS ~AGE + MP + FT + MPG + PAGEVIEWS + TWITTER_FAVORITE_COUNT, data = NBA_stat)
+lm.forward =lm(SALARY_MILLIONS ~ POINTS + AGE + DRB + PF, data = NBA_stat)
+lm.both =lm(SALARY_MILLIONS ~ POINTS + AGE + DRB + PF, data = NBA_stat)
+```
+
+\begin{enumerate}
+\item \textbf{Backward Elimination} It chooses ``AGE + MP + FT + MPG + PAGEVIEWS + TWITTER FAVORITE COUNT`` as predictors, and it gets BIC=708.97.
+\item \textbf{Forward Selection} It chooses ``POINTS + AGE + DRB + PF`` as predictor, and it gets BIC=711.48.
+\item \textbf{Stepwise Regression} It gets the same result as Forward Selection.
+\end{enumerate}
+
+All of these three methods choose too many predictors when we use the AIC criterion. However, when we use BIC criterion, they tend to select fewer predictors. We think it is because the BIC criterion is largely influenced by the sample size, so since our dataset is large, it tends to choose fewer predictors comparing with the AIC. Because we want to simplify our model and make it interpretable, the predictors we got in BIC are preferable, and since the "Forward Selection" and "Stepwise Regression" get the same result, we will adopt the predictors selected from them and do the analysis.
+
+\subsection{Diagnostics}
+In our multivariate regression model (\ref{MLR}), we have assumed $\text{E}(\mathbf{Y}|\mathbf{X})=\mathbf{X\beta}, \text{Var}(\mathbf{Y}|\mathbf{X})=\sigma^2\mathbf{I}$, and our error terms $\varepsilon_i$ are $iid \sim Normal(0,\sigma^2)$. In order to check the correctness of our model's assumptions, we analyze the residual $\hat{\mathbf{e}} =\mathbf{Y}-\mathbf{\hat{Y}}$. The residuals should satisfy $\text{E}(\hat{\mathbf{e}})=\mathbf{0}$ and $\text{Var}(\hat{\mathbf{e}})= \sigma^2(\mathbf{I}-\mathbf{H})$, where $\mathbf{H}=\mathbf{X'(X'X)^{-1}X}$. We draw the scatterplot of standardized residual $\mathbf{r}=\frac{\mathbf{\hat{e}}}{\hat{\sigma}\sqrt{\mathbf{I-H}}}$ against the fitted value. Therefore, if our assumptions are correct, the scatterplot \ref{fig:residual} should not have obvious patterns.
+
+```{r, include=FALSE}
+#Transformation
+fit0=lm(sqrt(SALARY_MILLIONS)~1,data=NBA_stat)
+fitfull=lm(sqrt(SALARY_MILLIONS)~.+POSITION*.,data=NBA_stat)
+
+step(fit0, k = log(nrow(NBA_stat)), scope=list(lower=fit0, upper=fitfull),
+direction="both")
+
+sqrtlm.both = lm(sqrt(SALARY_MILLIONS) ~ POINTS + AGE + DRB, data = NBA_stat)
+shapiro.test(rstandard(sqrtlm.both))
+
+#Cook Distance
+max(cooks.distance(sqrtlm.both))
+```
+```{r, echo=FALSE, fig.cap="\\label{fig:residual}(1) The first two scatterplots are standardized residuals against the fitted value before and after the transformation. (2) The third and forth plots are QQ-plots of standardized residuals before and after the transformation.",fig.height=3}
+#standard residual and QQplot without transformation
+par(mfrow=c(1,4))
+plot(fitted(lm.both), rstandard(lm.both) ,main = "Before", xlab = "", ylab = "")
+
+#standard residual and QQplot with transformation
+
+plot(fitted(sqrtlm.both), rstandard(sqrtlm.both) ,main = "After", xlab = "", ylab = "")
+
+qqnorm(rstandard(lm.both), main = "Before", xlab = "", ylab = "")
+qqline(rstandard(lm.both))
+qqnorm(rstandard(sqrtlm.both), main = "After", xlab = "", ylab = "")
+qqline(rstandard(sqrtlm.both))
+```
+
+It is obvious that our standardized plot (Figure \ref{fig:residual}) has right-opening megaphone shape, which means our constant variance assumption has not been satisfied. We can see that $\text{Var}(\mathbf Y|\mathbf X)\propto \text{E}(\mathbf Y|\mathbf X)$, so we do the square root transformation for our response variable (players' salary) at first, and then repeat our variable selection by "Stepwise Regression" and BIC criterion. This time we choose `POINTS + AGE + DRB` as our response variables and the BIC=-93.8. We draw a new scatterplot of standardized residual, and it does not show any pattern this time, which means our constant variance has been satsified. Also, in the QQ-plot (Figure \ref{fig:residual}), we can see that most points fit the straight line perfectly after the transformation. We also perform the Shapiro-Wilk test of normality. The corresponding p-value is close to 1, which is a perfect support of the normality assumption of the residuals. Besides, the maximum of Cook's distance in this model is 0.1, which means no obvious influential point in our data.
+
+After examining the residuals, checking for influential observations there is no compelling evidence that any of the usual MLR assumptions are violated.
+
+\subsection{Cross Validation}
+In this subsection, we will adopt the K-fold Cross-Validation method to assess if our fitted model will be useful for prediction. The idea is to divide our available data into k equal sized groups. Each time a single group is retained as the validation data for testing, and the remaining k-1 groups are used to fit the model. The process will repeat k times, and k groups used exactly once as the validation data. The so-call K-fold CV estimator is $$\frac1N\sum_{i=1}^N (Y_i- \hat{Y_i})^2,$$ where $\hat{Y_i}$ is the predicted value of $Y_i$ when the model was fit without the group that case i belongs to. We run the K-fold CV 1 time, and the K-fold CV estimator is 0.6, which is close to the MSE of our regression model. The result is shown in the Appendix \ref{KCV}.
+
+\subsection{Conclusion}
+After the cross validation, we firmly believe that our model can be useful in predicting the salary of a basketball player. This multivariate regression model only contains three predictors, `POINTS + AGE + DRB` and the intercept, which is easy to interprete and understand. Based on our result (Appendix \ref{SM}), the final model is:
+\begin{equation}
+\sqrt{\text{Salary}} = -1.3582 + 0.0986POINTS + 0.0975AGE + 0.1012DRB
+\end{equation}
+
+The interpretation for the coefficient of `DRB` is, for example, when Defensive Rebounds increases one unit and other predictors are fixed, the square root of salary will approximately increase 0.1012 units. From this model, we can see that the coefficients of these predictors are all positive, which means they have positive contribution to the salary. We only choose these three predictors does not means other predictors are not important, instead it means there may exist strong correlations between these three predictor and other potential predictors. However, since the $R^2\approx 0.56$, which means these three predictors can explain 56% of variability in salary, which are sufficient enough for us to do the prediction and provide a useful suggestion to the team manager.
+
+
+
+\section{Team Valuation: Method and Results}
+```{r,echo=FALSE}
+### This is to build the necessary data frame for analysis
+load("dataset.RData")
+## da7 is useless, data is inclued in da2
+NA_check=da.4$TWITTER_RETWEET_COUNT+da.4$TWITTER_FAVORITE_COUNT+da.4$PAGEVIEWS;
+da.4=da.4[which(!is.na(NA_check)),];
+row.names(da.4)=seq(1,dim(da.4)[1]);
+#ticket price: From https://www.vividseats.com/blog/nba-ticket-prices
+## Order should be rewritten 
+### From the File: nba_2017_att_val_elo_with_cluster
+GDP=c(651222,511606,122218,328482,330000,1001677,129440,470529,70235,1657457,422660,1001677,164466,116538,84826,126797,77163,478618,230070,135444,71450,163637,431038,363768,1657457,100869,509224,197969,246689,252691);
+GDP=c(GDP[24],GDP[25],GDP[11],GDP[22],GDP[1],GDP[7],GDP[2],GDP[28],GDP[30],GDP[8],GDP[18],GDP[20],GDP[6],GDP[12],GDP[21],GDP[4],GDP[26],GDP[29],GDP[17],GDP[10],GDP[9],GDP[16],GDP[23],GDP[19],GDP[13],GDP[14],GDP[3],GDP[5],GDP[15],GDP[27]);
+WIN=c(41,33,32,41,51,51,51,67,47,31,53,26,41,61,51,29,34,55,24,42,43,36,28,43,20,42,49,40,31,37);
+WIN=c(WIN[24],WIN[25],WIN[11],WIN[22],WIN[1],WIN[7],WIN[2],WIN[28],WIN[30],WIN[8],WIN[18],WIN[20],WIN[6],WIN[12],WIN[21],WIN[4],WIN[26],WIN[29],WIN[17],WIN[10],WIN[9],WIN[16],WIN[23],WIN[19],WIN[13],WIN[14],WIN[3],WIN[5],WIN[15],WIN[27]);
+### From the File: nba_2017_team_valuations
+TICKET_PRICE=c(177,139,215,95,90,50,89,88,74,55,114,105,95,75,78,70,85,65,49,55,44,93,57,38,70,41,52,45,73,35);
+TICKET_PRICE=c(TICKET_PRICE[23],TICKET_PRICE[7],TICKET_PRICE[5],TICKET_PRICE[28],TICKET_PRICE[4],TICKET_PRICE[11],TICKET_PRICE[9],TICKET_PRICE[22],TICKET_PRICE[21],TICKET_PRICE[3],TICKET_PRICE[8],TICKET_PRICE[24],TICKET_PRICE[6],TICKET_PRICE[2],TICKET_PRICE[26],TICKET_PRICE[10],TICKET_PRICE[27],TICKET_PRICE[29],TICKET_PRICE[30],TICKET_PRICE[1],TICKET_PRICE[17],TICKET_PRICE[19],TICKET_PRICE[25],TICKET_PRICE[14],TICKET_PRICE[16],TICKET_PRICE[12],TICKET_PRICE[15],TICKET_PRICE[13],TICKET_PRICE[20],TICKET_PRICE[18]);
+TEAM_EVALUATION=c(885,2200,1800,780,2500,1200,1450,890,900,2600,1650,880,2000,3000,790,1350,785,770,750,3300,1025,920,800,1100,1050,1075,1175,1125,910,1000);
+varmat=data.frame(matrix(c(da.4$POINTS,da.4$AST,da.4$TRB,da.4$STL,da.4$BLK,da.4$SALARY_MILLIONS,da.4$PAGEVIEWS,da.4$TWITTER_FAVORITE_COUNT,da.4$TWITTER_RETWEET_COUNT),nrow = dim(da.4)[1]));
+varmat$PLAYER=da.4$PLAYER;
+varmat$TEAM=da.4$TEAM;
+varmat[4,]$TEAM="SAC"
+varmat[85,]$TEAM="TOR"
+varmat[89,]$TEAM="OKC"
+varmat[93,]$TEAM="SAC"
+varmat[98,]$TEAM="SAC"
+varmat[101,]$TEAM="POR"
+varmat[103,]$TEAM="CLE"
+varmat[127,]$TEAM="PHI"
+varmat[138,]$TEAM="SAC"
+varmat[149,]$TEAM="PHI"
+varmat[167,]$TEAM="CHA"
+varmat[170,]$TEAM="MEM"
+varmat[175,]$TEAM="BKN"
+varmat[179,]$TEAM="OKC"
+varmat[183,]$TEAM="PHI"
+varmat[185,]$TEAM="OKC"
+varmat[198,]$TEAM="LAL"
+varmat[202,]$TEAM="LAL"
+varmat[205,]$TEAM="ORL"
+varmat[217,]$TEAM="CHA"
+varmat[219,]$TEAM="DAL"
+varmat[223,]$TEAM="WSH"
+varmat[224,]$TEAM="DAL"
+varmat[225,]$TEAM="CHA"
+colnames(varmat)=c("POINTS","AST","TRB","STL","BLK","SALARY_MILLIONS","PAGEVIEWS","TWITTER_FAVORITE_COUNT","TWITTER_RETWEET_COUNT","PLAYER","TEAM")
+temp = as.character(varmat$TEAM)
+varmat$TEAM_ID=as.numeric(as.factor(temp));
+teammat=data.frame(matrix(1:270,nrow = 30,ncol = 9));
+colnames(teammat)=c("POINTS","AST","TRB","STL","BLK","SALARY_MILLIONS","PAGEVIEWS","TWITTER_FAVORITE_COUNT","TWITTER_RETWEET_COUNT");
+for(i in unique(varmat$TEAM_ID))
+{
+  teammat$POINTS[i]=max(varmat[which(varmat$TEAM_ID==i),]$POINTS);
+  teammat$AST[i]=max(varmat[which(varmat$TEAM_ID==i),]$AST);
+  teammat$TRB[i]=max(varmat[which(varmat$TEAM_ID==i),]$TRB);
+  teammat$STL[i]=max(varmat[which(varmat$TEAM_ID==i),]$STL);
+  teammat$BLK[i]=max(varmat[which(varmat$TEAM_ID==i),]$BLK);
+  teammat$SALARY_MILLIONS[i]=sum(varmat[which(varmat$TEAM_ID==i),]$SALARY_MILLIONS)
+  teammat$PAGEVIEWS[i]=sum(varmat[which(varmat$TEAM_ID==i),]$PAGEVIEWS)
+  teammat$TWITTER_FAVORITE_COUNT[i]=sum(varmat[which(varmat$TEAM_ID==i),]$TWITTER_FAVORITE_COUNT)
+  teammat$TWITTER_RETWEET_COUNT[i]=sum(varmat[which(varmat$TEAM_ID==i),]$TWITTER_RETWEET_COUNT)
+}
+teammat$TEAM=as.character(rep("HOU",30));
+for(i in 1:30)
+{
+  teammat$TEAM[i]=unique(as.character(varmat[varmat$TEAM_ID==i,]$TEAM));
+}
+teammat$TEAM=as.factor(teammat$TEAM);
+teammat$GDP=GDP;
+teammat$GDP_POS=rep(0,30);
+for(x in 1:30)
+{
+  if(teammat[x,]$GDP<100000)
+  {
+    teammat[x,]$GDP_POS=0;
+  }
+  else 
+  {
+    if(teammat[x,]$GDP<300000)
+    {
+      teammat[x,]$GDP_POS=1;
+    }
+    else if(teammat[x,]$GDP<1000000)
+    {
+      teammat[x,]$GDP_POS=2;
+    }
+    else
+    {
+      teammat[x,]$GDP_POS=3;
+    }
+  }
+}
+teammat$GDP_POS=as.factor(teammat$GDP_POS);
+teammat$WIN=WIN;
+teammat$TICKET_PRICE=TICKET_PRICE;
+teammat$TEAM_EVALUATION=TEAM_EVALUATION;
+
+
+
+teammat$lg_TEAM_EVALUATION=log(teammat$TEAM_EVALUATION);
+teammat$lg_PAGEVIEWS=log(teammat$PAGEVIEWS);
+teammat$lg_GDP=log(teammat$GDP);
+teammat$lg_TWITTER_FAVORITE_COUNT=log(teammat$TWITTER_FAVORITE_COUNT);
+teammat$lg_TWITTER_RETWEET_COUNT=log(teammat$TWITTER_RETWEET_COUNT);
+teammat$lg_salary=log(teammat$SALARY_MILLIONS);
+teammat$lg_TICKET_PRICE=log(teammat$TICKET_PRICE)
+```
+```{r,echo=FALSE}
+
+teammat=teammat[-c(6,10,20,23),];
+row.names(teammat)=c(1:26)
+teammat=teammat[-c(16,22),]
+row.names(teammat)=c(1:24)
+teammat=teammat[-c(12),]
+row.names(teammat)=c(1:23)
+```
+\subsection{Potential Predictors}\label{PP2}
+
+Intuitively, reasonable predictor variables include regional GDP, tickets prices, and performace statistics, salaries, social power of elite players. Notice not all performance statitics are reasonable for our analysis. With the help of information in \ref{intro} part, we can know only the basic performance statistics seem reasonable since it can stimulate the purchase of tickets directly. So we only include `PTS`, `rebounds`, `assists` and some other 5 performance statitiscs variables to reduce the number of variables we will consider. After that, we use the sum of personal performance statistics within a team to represent the corresponding team performance statistics, for example, use the sum of `PTS` within a team to represent `team_PTS`. Besides, we add up the salaries and social power variables of players within a team to represent the corresponding team variables. Lastly, other accessory informaton like `TICKET_PRICE` is also included. Considering the different scale of the variables, we take the logarithm for some of them. We plot a summary scatter plot matrix of typical variables below to describe the relationship between these variables in Appendix \ref{SPM}.
+
+In the scatter plot matrix, we have already delete the strange points in our dataset, which has been explained in our EDA. There seems to be no strange behavior after the deletion, which means we can carry on to the main part of our analysis.
+
+\subsection{Variable Selection}
+
+Given the reasonable variables we analyze in part \ref{PP2}, we employ backward selection method with BIC criterion to choose the "best" linear regression model for analysis. Before implementing the stepwise search methods, let's first look at the plot of all subsets \ref{BIC2} to have a basic evaluation of important variables we should pay more attention. A quick conclusion from this plot is `lg_GDP` and `lg_TICKET_PRICE` are important for BIC selection criterion. Besides, the inclusion of a social power variables, `lg_TWITTER_RETWEET_COUNT` is somewhat surprising since it might inform us the importance of social power on team valuation. As for the basic performance statistics, notice only variable `POINTS` is excluded, this might be due to the fact that the highest points in each team will not be so different compared with the other 4 basic performance statistics. 
+
+Now let's use the backward selection method with BIC criterion to implement model selection, the result is present in \ref{VSR}. The final result is the same as what the plot above indicates. So we use the chosen model as the standard model for further analysis, which selects `AST`, `TRB`, `STL`, `BLK`, `lg_TICKET_PRICE`, `lg_TWITTER_RETWEET_COUNT` and `lg_GDP` as predictors.
+
+```{r,echo=FALSE,fig.width=6,fig.height=6,fig.align="center"}
+teammods=regsubsets(lg_TEAM_EVALUATION~.,data=subset(teammat,select = c(-TEAM,-GDP,-GDP_POS,-TEAM_EVALUATION,-PAGEVIEWS,-TWITTER_FAVORITE_COUNT,-TWITTER_RETWEET_COUNT,-SALARY_MILLIONS,-TICKET_PRICE)), nbest=2, nvmax=ncol(teammat))
+```
+
+```{r,echo=FALSE}
+team_model=lm(lg_TEAM_EVALUATION~ AST + TRB + STL + BLK+lg_TWITTER_RETWEET_COUNT+lg_GDP+lg_TICKET_PRICE,data=teammat);
+```
+
+
+\subsection{Diagnostics and Analysis}
+Considering the small sample we have, We cannot do the lack of fit test in our problem setting.  However, from the diagnostic graph, we can see there are no severe violations to the regression model, which means the model we fit is good. So it's safe to use our model selected above. The fitted result is given below.
+
+Now let's look at the model we use to explore our dataset. One interesting question is whether team's social power has impacts on team's valuation. The answer of the question is important since if it is true, a direct strategy for managers to increase the team valuation is: sign free players who used to be the all-star. In our model, the only variable associated with social power is `lg_TWITTER_RETWEET_COUNT`, which is siginifcant according to t test. The result tells us the social power does have impacts on the team valuation. Also notice the sign of `lg_TWITTER_RETWEET_COUNT` is positive, so the managers can sign the palyers with high `TWITTER_RETWEET_COUNT` to increase the team valuation. Another interesting result is that variable `AST` is not significant in the summary table. A possibile interpretation for this is: The small ball trend in NBA speeds up the games, so a team good at blocks, steals will stand out in that trend. This argument is also supported by the sign of variable `TRB`, which is negative since the team with more rebounds tends to play more slowly. 
+
+```{r,echo=FALSE}
+par(mfrow=c(2,2))
+plot(x=fitted(team_model),y=resid(team_model),main = "Raw Residual Plot")
+abline(h=0,lty=2,col="blue")
+plot(x=fitted(team_model),y=rstandard(team_model),main="Standardized Plot")
+abline(h=0,lty=2,col="blue")
+plot(x=fitted(team_model),y=studres(team_model),main="Studentized Plot")
+abline(h=0,lty=2,col="blue")
+qqnorm(resid(team_model))
+qqline(resid(team_model))
+summary(team_model);
+```
+
+
+\subsection{Conclusion}
+Our fitted model suggests a positive association between the counts of Twitter retweet and Team valuation. A direct conclusion for this is: if the manager wants to increase the team valuation, one strategy he/she could take is to sign players in free player market with relatively large social power. For example, some players who used to be all-stars but are now in the free player market could be the potential targets. Reasonable as our result sounds, the value of the coefficient of social power might be a little confusing, since it indicates 1% increase in team's counts of Twitter retweet could increase the team valuation up to 23.6%. So if we can find more available data and arrange them into a panel form, we could get a more accurate relationship between the social power and team valuation. 
+
+\section{Discussion}
+
+In this project, we investigate the important factors to determine the players' salary and team valuation, and we provide our specific answer and interpretation in each section. Our results show that the models fit the data pretty well. However, there are still some limitations in our project. Firstly, we only consider the linear relationship between our response variables and potential predictors, but we do not consider the transformations or the polynomials of our potential predictors. So if there exist any nonlinear relationships between them, our model will miss these information. Second, in the model selection part, we choose stepwise regression and BIC criteria to get our final predictors since it can simplify our model. However, there is no evidence which can supports our conclusion. To deal with these problems, we can consider more complex model which includes the transformation of predictors as potential predictors. Also, asking for some expertise or getting some prior knowledge can help us choose the correct predictors.
+
+What's more, we also notice that 100 players are considered as elite players based on their performance in the 2016-2017 season. An interesting direction of future work is to predict the whether a player would be a elite player in the following season. Because the simple variable selection methods are not useful here, we choose the same predictors as in our multivariate regression model. The preliminary result is shown in Appendix \ref{LM}, and we would like to investigate it deeper in the future.
+
+\newpage
+\section{Appendix}
+
+\subsection{Exploratory data analysis}\label{EDA}
+```{r,echo=FALSE,fig.height=4}
+EDA.data=da1;
+bp_plot_Point=ggplot(EDA.data,aes(x=POSITION,y=POINTS,fill=POSITION))+geom_boxplot()
+bp_plot_Reb=ggplot(EDA.data,aes(x=POSITION,y=TRB,fill=POSITION))+geom_boxplot()
+bp_plot_Ast=ggplot(EDA.data,aes(x=POSITION,y=AST,fill=POSITION))+geom_boxplot()
+bp_plot_Tov=ggplot(EDA.data,aes(x=POSITION,y=TOV,fill=POSITION))+geom_boxplot()
+multiplot(bp_plot_Point,bp_plot_Reb,bp_plot_Ast,bp_plot_Tov,cols=2)
+```
+
+```{r,echo=FALSE,fig.height=3.8}
+scatter_p1=ggpairs(data=EDA.data, columns=c(22,23,26,28,39)) + theme_bw();
+scatter_p2=ggpairs(data=EDA.data, columns=c(30,31,35,36,38,39)) + theme_bw();
+multiplot(scatter_p1,scatter_p2,cols = 2)
+```
+
+\subsection{Salary model}\label{SM}
+```{r,echo=FALSE}
+summary(sqrtlm.both)
+```
+
+\subsection{Logistic model}\label{LM}
+```{r, echo=FALSE}
+#Logistic Regression for elite
+eli = rep(0, nrow(da1))
+da1 = data.frame(da1, eli)
+for (i in c(1:nrow(da1)))
+{
+  if (length(which(elite$PLAYER_NAME == as.character(da1$PLAYER[i])))>0 )
+    da1$eli[i] = 1
+}
+NBA_eli = da1
+NBA_eli$X<-NULL
+NBA_eli$Rk<-NULL
+NBA_eli$PLAYER<-NULL
+NBA_eli$TEAM<-NULL
+NBA_eli<-na.omit(NBA_eli)
+NBA_eli = NBA_eli[c(-214, -215, -225),]
+
+logit.lm =  glm(eli~POINTS + AGE + DRB, data=NBA_eli, family = binomial(link = "logit"))
+summary(logit.lm)
+```
+
+\subsection{Team Valuation: variable selection}\label{VSR}
+```{r,echo=FALSE}
+team_model_full=lm(lg_TEAM_EVALUATION~.,data=subset(teammat,select = c(-TEAM,-GDP,-GDP_POS,-TEAM_EVALUATION,-PAGEVIEWS,-TWITTER_FAVORITE_COUNT,-TWITTER_RETWEET_COUNT,-SALARY_MILLIONS,-TICKET_PRICE)));
+step(team_model_full, data=subset(teammat,select = c(-TEAM,-GDP,-GDP_POS,-TEAM_EVALUATION,-PAGEVIEWS,-TWITTER_FAVORITE_COUNT,-TWITTER_RETWEET_COUNT,-SALARY_MILLIONS,-TICKET_PRICE)),direction="backward",  
+       k=log(dim(teammat)[1]),trace = FALSE)
+```
+
+\subsection{K-fold CV plot}\label{KCV}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#K-folds cross validation
+CV=cv.lm(data  = NBA_stat, form.lm = formula(SALARY_MILLIONS ~ POINTS + AGE + DRB), m=5, dots = 
+FALSE, seed=21, plotit=TRUE, printit=FALSE)
+```
+
+\subsection{Scatter plot matrix of typical variables}\label{SPM}
+```{r,echo=FALSE,fig.height=4.5}
+ggpairs(teammat[,c(21,17,18,19,20,16)])+ theme_bw();
+```
+
+\subsection{Variable selection plot with BIC criterion}\label{BIC2}
+```{r,echo=FALSE,fig.height=6}
+plot(teammods, scale="bic");
+```
+
+
+
